@@ -1,0 +1,107 @@
+<!--
+title: Test MQ Page
+-->
+
+<div class="row justify-content-between pt-3">
+    <div class="col">
+        <h4 class="pb-3">Test MQ</h4>
+        <div class="row">
+            <div class="col col-2">
+                <div class="btn-group ml-3">
+                    <button class="btn btn-outline-primary" data-click="incr:-1">-</button>
+                    <button class="btn btn-outline-primary" data-click="incr:1">+</button>
+                </div>
+            </div>
+            <div class="col col-auto">
+                <input class="form-control ml-1" type="text" id="txtName" value="Test" placeholder="Name" data-input="incr:0">
+            </div>
+        </div>
+        <div class="py-3 ml-3">
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="mq-publish" id="radOneWay" value="OneWay" checked>
+                <label class="form-check-label" for="radOneWay">OneWay Endpoint</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="mq-publish" id="radPublishMq" value="PublishMq">
+                <label class="form-check-label" for="radPublishMq">PublishMq Service</label>
+            </div>
+        </div>
+        <div class="py-2">
+            <button class="btn btn-secondary" data-click="refresh">Refresh State</button>
+        </div>
+        <dl>
+            <dt>Name:</dt>
+            <dd id="name"></dd>
+            <dt>Counter:</dt>
+            <dd id="counter"></dd>
+        </dl>
+    </div>
+    <div class="col">
+        <pre id="mqstats">{{ mqService.mqStatsDescription() }}</pre>
+    </div>
+</div>
+
+{{#raw appendTo scripts}}
+<script>
+    // Can remove generated DTO's from MqServices once included in App's dtos.js
+    if (typeof TestMq == 'undefined') {
+        TestMq = /** @class */ (function () {
+            function TestMq(init) {
+                Object.assign(this, init);
+            }
+            TestMq.prototype.createResponse = function () { return new TestMqResponse(); };
+            TestMq.prototype.getTypeName = function () { return 'TestMq'; };
+            return TestMq;
+        }());
+    }
+    if (typeof PublishMq == 'undefined') {
+        PublishMq = /** @class */ (function () {
+            function PublishMq(init) {
+                Object.assign(this, init);
+            }
+            PublishMq.prototype.createResponse = function () { };
+            PublishMq.prototype.getTypeName = function () { return 'PublishMq'; };
+            return PublishMq;
+        }());
+    }
+
+    if (typeof client == 'undefined')
+        client = new JsonServiceClient('/');
+
+    var timeout,
+        $name = document.getElementById("name"),
+        $counter = document.getElementById("counter"),
+        $mqstats = document.getElementById("mqstats"),
+        $txtName = document.getElementById("txtName"),
+        $chkOneWay = document.getElementById("chkOneWay");
+
+    function refresh() {
+        client.get(new TestMq())
+            .then(function (r) {
+                $name.innerHTML = r.name;
+                $counter.innerHTML = r.counter;
+                $mqstats.innerHTML = r.statsDescription;
+            });
+        timeout = null;
+    }
+
+    function refreshTimeout() {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(refresh, 250);
+    }
+
+    bindHandlers({
+        incr(add) {
+            var oneway = document.querySelector('input[name=mq-publish]:checked').value === "OneWay";
+            if (oneway) {
+                client.publish(new TestMq({ name: $txtName.value, add: parseInt(add, 10) }))
+                    .then(refreshTimeout);
+            } else {
+                client.post(new PublishMq({ name: $txtName.value, add: parseInt(add, 10) }))
+                    .then(refreshTimeout);
+            }
+        },
+        refresh: refresh
+    });
+</script>
+{{/raw}}
